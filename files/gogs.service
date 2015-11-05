@@ -1,0 +1,15 @@
+[Unit]
+Description=Go Git Service
+After=network.target
+
+[Service]
+Type=simple
+RuntimeDirectory=gogs
+RuntimeDirectoryMode=775
+ExecStart=/opt/go/bin/gogs web --config /etc/gogs/app.ini
+Restart=always
+User=git
+Group=git
+
+[Install]
+WantedBy=multi-user.target

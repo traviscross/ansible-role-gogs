@@ -1,0 +1,114 @@
+---
+- name: install gogs dependencies
+  apt: "name={{ item }} state=installed"
+  with_items:
+    - git
+    - ca-certificates
+    - golang
+    - rsync
+    - openssh-server
+    - postfix
+    - postgresql
+    - nginx
+
+- name: install ansible deps for postgresql configuration
+  apt: name=python-psycopg2 state=present
+
+- name: add system group for git
+  group: name=git system=yes state=present
+
+- name: add system user for git
+  user: name=git system=yes group=git
+    home=/var/lib/git
+    shell=/bin/sh
+    state=present
+
+- name: configure postgresql for local ident authentication
+  lineinfile: dest=/etc/postgresql/9.4/main/pg_hba.conf
+    regexp="^local[ \t]+all[ \t]+all[ \t]+ident map=git$"
+    line="local  all  all  ident map=git"
+    insertbefore="^local[ \t]+all[ \t]+postgres[ \t]+peer$"
+  register: pg_hba
+
+- name: configure postgresql to allow local connections from root
+  lineinfile: dest=/etc/postgresql/9.4/main/pg_ident.conf
+    regexp="^git[ \t]+root[ \t]+postgres$"
+    line="git  root  postgres"
+  register: pg_ident_root
+
+- name: configure postgresql to allow local connections from git
+  lineinfile: dest=/etc/postgresql/9.4/main/pg_ident.conf
+    regexp="^git[ \t]+git[ \t]+git$"
+    line="git  git  git"
+  register: pg_ident_git
+
+- name: restart postgresql
+  service: name=postgresql state=restarted
+  when: pg_hba.changed or pg_ident_root.changed or pg_ident_git.changed
+
+- name: add postgresql user for git
+  postgresql_user: name=git role_attr_flags=CREATEDB
+
+- name: add postgresql db for gogs
+  postgresql_db: name=gogs owner=git
+    template="template0" encoding="UTF-8"
+
+- name: grant postgresql user git permissions on gogs db
+  postgresql_user: name=git role_attr_flags=CREATEDB
+    db=gogs priv="ALL"
+
+- name: create go directory
+  file: path=/opt/go state=directory mode=0755
+
+- name: clone gogs upstream
+  git: repo=https://github.com/gogits/gogs.git
+    dest=/opt/go/src/github.com/gogits/gogs
+    version=master
+
+- name: clone gogs
+  git: repo=https://github.com/traviscross/gogs.git
+    dest=/opt/go/src/github.com/traviscross/gogs
+    version=master
+
+- name: install gogs source dependencies
+  shell: GOPATH=/opt/go go get -u
+  args:
+    chdir: /opt/go/src/github.com/traviscross/gogs
+
+- name: build gogs
+  shell: GOPATH=/opt/go go build -v
+  args:
+    chdir: /opt/go/src/github.com/traviscross/gogs
+
+- name: install gogs systemd unit
+  copy: src=gogs.service dest=/etc/systemd/system/
+  register: gogs_unit
+
+- name: reload systemd
+  command: /bin/systemctl daemon-reload
+  when: gogs_unit.changed
+
+- name: create gogs config directory
+  file: path=/etc/gogs state=directory mode=0755
+
+- name: install gogs config
+  copy: src=app.ini dest=/etc/gogs/
+  register: gogs_conf
+
+- name: create git data directory
+  file: path=/var/lib/git state=directory mode=0755
+    owner=git group=git
+
+- name: create git repo directory
+  file: path=/var/lib/git/repos state=directory mode=0755
+    owner=git group=git
+
+- name: sync gogs public files
+  shell: rsync -rtv /opt/go/src/github.com/traviscross/gogs/public /var/lib/git/
+
+- name: sync gogs template files
+  shell: rsync -rtv /opt/go/src/github.com/traviscross/gogs/templates /var/lib/git/
+
+- name: restart gogs
+  service: name=gogs state=restarted
+  when: gogs_unit.changed or gogs_conf.changed
