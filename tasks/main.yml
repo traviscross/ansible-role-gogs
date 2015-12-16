@@ -1,4 +1,18 @@
 ---
+- name: add jessie-backports to sources.list
+  lineinfile: dest=/etc/apt/sources.list
+    regexp="^deb[ \t]+[^ ]+[ \t]+jessie-backports[ \t]+"
+    line="deb http://httpredir.debian.org/debian jessie-backports main"
+  register: apt_sources
+
+- name: setup golang to install from backports
+  copy: src=apt-preferences-golang dest=/etc/apt/preferences.d/01go-backports
+  register: apt_preferences
+
+- name: apt-get update
+  shell: apt-get update
+  when: apt_sources.changed or apt_preferences.changed
+
 - name: install gogs dependencies
   apt: "name={{ item }} state=installed"
   with_items:
