@@ -60,25 +60,20 @@
 - name: create go directory
   file: path=/opt/go state=directory mode=0755
 
-- name: clone gogs upstream
+- name: clone gogs
   git: repo=https://github.com/gogits/gogs.git
     dest=/opt/go/src/github.com/gogits/gogs
-    version=master
-
-- name: clone gogs
-  git: repo=https://github.com/traviscross/gogs.git
-    dest=/opt/go/src/github.com/traviscross/gogs
     version=master
 
 - name: install gogs source dependencies
   shell: GOPATH=/opt/go go get -u
   args:
-    chdir: /opt/go/src/github.com/traviscross/gogs
+    chdir: /opt/go/src/github.com/gogits/gogs
 
 - name: build gogs
   shell: GOPATH=/opt/go go build -v
   args:
-    chdir: /opt/go/src/github.com/traviscross/gogs
+    chdir: /opt/go/src/github.com/gogits/gogs
 
 - name: install gogs systemd unit
   copy: src=gogs.service dest=/etc/systemd/system/
@@ -104,10 +99,10 @@
     owner=git group=git
 
 - name: sync gogs public files
-  shell: rsync -rtv /opt/go/src/github.com/traviscross/gogs/public /var/lib/git/
+  shell: rsync -rtv /opt/go/src/github.com/gogits/gogs/public /var/lib/git/
 
 - name: sync gogs template files
-  shell: rsync -rtv /opt/go/src/github.com/traviscross/gogs/templates /var/lib/git/
+  shell: rsync -rtv /opt/go/src/github.com/gogits/gogs/templates /var/lib/git/
 
 - name: restart gogs
   service: name=gogs state=restarted
