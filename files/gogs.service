@@ -11,6 +11,7 @@ ExecStart=/opt/go/bin/gogs web --config /etc/gogs/app.ini
 Restart=always
 User=git
 Group=git
+Environment=USER=git HOME=/var/lib/git
 
 [Install]
 WantedBy=multi-user.target
