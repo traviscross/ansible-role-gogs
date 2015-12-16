@@ -61,7 +61,7 @@
   when: pg_hba.changed or pg_ident_root.changed or pg_ident_git.changed
 
 - name: add postgresql user for git
-  postgresql_user: name=git role_attr_flags=CREATEDB
+  postgresql_user: name=git role_attr_flags=CREATEDB password=git
 
 - name: add postgresql db for gogs
   postgresql_db: name=gogs owner=git
